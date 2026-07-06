@@ -5,3 +5,9 @@ Pydantic for request and response validation
 SQLAlchemy as the ORM as it integrates well with FastAPI
 pytest for testing
 ruff for linting
+
+Tables in DB:
+Farmers - List of farmers, each farmer can have many cows
+Cows - List of cows, each cow has one farmer, each cow has many measurements
+Cow Measurements - Cow measurements, updated each time a cow is measured, a cow will have multiple measurements
+
