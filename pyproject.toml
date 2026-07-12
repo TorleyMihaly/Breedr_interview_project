@@ -9,6 +9,9 @@ select = ["E", "F", "I", "UP", "B"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
+[tool.fastapi]
+entrypoint = "app.main:app"
+
 [project]
 name = "breedr-interview-project"
 version = "0.1.0"
