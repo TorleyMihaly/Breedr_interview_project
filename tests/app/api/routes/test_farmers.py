@@ -269,3 +269,62 @@ def test_get_farmer_rejects_non_integer_farmer_id(
     assert response.status_code == 422
 
     db.scalar.assert_not_called()
+
+
+def test_delete_farmer_success(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    farmer = make_farmer(farmer_id=1)
+    db.get.return_value = farmer
+
+    response = client.delete("/farmers/1")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    db.get.assert_called_once_with(FarmerModel, 1)
+    db.delete.assert_called_once_with(farmer)
+    db.commit.assert_called_once()
+    db.rollback.assert_not_called()
+
+
+def test_delete_farmer_returns_404_when_farmer_does_not_exist(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    db.get.return_value = None
+
+    response = client.delete("/farmers/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Farmer not found"}
+
+    db.get.assert_called_once_with(FarmerModel, 999)
+    db.delete.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_not_called()
+
+
+def test_delete_farmer_rolls_back_when_database_rejects_delete(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    farmer = make_farmer(farmer_id=1)
+    db.get.return_value = farmer
+    db.commit.side_effect = IntegrityError(
+        statement="DELETE FROM farmers ...",
+        params={},
+        orig=Exception("database error"),
+    )
+
+    response = client.delete("/farmers/1")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Farmer could not be deleted"}
+
+    db.get.assert_called_once_with(FarmerModel, 1)
+    db.delete.assert_called_once_with(farmer)
+    db.commit.assert_called_once()
+    db.rollback.assert_called_once()
+

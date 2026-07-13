@@ -52,3 +52,24 @@ def get_measurements(cow_id: Annotated[int, Query(alias="cowId", gt=0)], db: Ses
     statement = select(CowMeasurementModel).where(CowMeasurementModel.cow_id == cow_id).order_by(CowMeasurementModel.recorded_at.desc())
 
     return list(db.scalars(statement))
+
+@router.delete("/{measurement_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_measurement(measurement_id: int, db: SessionDep) -> None:
+    measurement = db.get(CowMeasurementModel, measurement_id)
+
+    if measurement is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Measurement not found",
+        )
+
+    db.delete(measurement)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Measurement could not be deleted",
+        ) from exc

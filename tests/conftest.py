@@ -1,8 +1,12 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx import Response
 from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -12,7 +16,7 @@ from app.models import Base
 
 
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def test_engine() -> Generator[Engine, None, None]:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -25,23 +29,54 @@ def client() -> Generator[TestClient, None, None]:
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
-    testing_session_local = sessionmaker(
-        bind=engine,
+    Base.metadata.create_all(bind=engine)
+
+    try:
+        yield engine
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+
+@pytest.fixture
+def test_session_factory(test_engine: Engine) -> sessionmaker[Session]:
+    return sessionmaker(
+        bind=test_engine,
         autoflush=False,
         expire_on_commit=False,
     )
 
-    Base.metadata.create_all(bind=engine)
+
+@pytest.fixture
+def app(test_session_factory: sessionmaker[Session]) -> Generator[FastAPI, None, None]:
+    test_app = create_app(create_tables=False)
 
     def override_get_db() -> Generator[Session, None, None]:
-        with testing_session_local() as db:
+        with test_session_factory() as db:
             yield db
 
-    app = create_app(create_tables=False)
-    app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_db] = override_get_db
 
-    with TestClient(app) as test_client:
-        yield test_client
+    try:
+        yield test_app
+    finally:
+        test_app.dependency_overrides.clear()
 
-    app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def api_client(app: FastAPI) -> Generator[TestClient, None, None]:
+    with TestClient(app) as client:
+        yield client
+
+
+@pytest.fixture
+def assert_response() -> Callable[[Response, int], Any]:
+    def _assert_response(response: Response, expected_status_code: int) -> Any:
+        assert response.status_code == expected_status_code, response.text
+
+        if not response.content:
+            return None
+
+        return response.json()
+
+    return _assert_response

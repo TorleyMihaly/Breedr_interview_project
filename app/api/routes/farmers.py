@@ -52,3 +52,24 @@ def get_farmer(farmer_id: int, db: SessionDep) -> FarmerModel:
         )
 
     return farmer
+
+@router.delete("/{farmer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_farmer(farmer_id: int, db: SessionDep) -> None:
+    farmer = db.get(FarmerModel, farmer_id)
+
+    if farmer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Farmer not found",
+        )
+
+    db.delete(farmer)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Farmer could not be deleted",
+        ) from exc

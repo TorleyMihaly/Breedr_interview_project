@@ -244,3 +244,61 @@ def test_get_measurements_requires_cow_id_query_parameter(
 
     db.get.assert_not_called()
     db.scalars.assert_not_called()
+
+
+def test_delete_measurement_success(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    measurement = make_measurement(measurement_id=10, cow_id=1)
+    db.get.return_value = measurement
+
+    response = client.delete("/measurements/10")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    db.get.assert_called_once_with(CowMeasurementModel, 10)
+    db.delete.assert_called_once_with(measurement)
+    db.commit.assert_called_once()
+    db.rollback.assert_not_called()
+
+
+def test_delete_measurement_returns_404_when_measurement_does_not_exist(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    db.get.return_value = None
+
+    response = client.delete("/measurements/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Measurement not found"}
+
+    db.get.assert_called_once_with(CowMeasurementModel, 999)
+    db.delete.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_not_called()
+
+
+def test_delete_measurement_rolls_back_when_database_rejects_delete(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    measurement = make_measurement(measurement_id=10, cow_id=1)
+    db.get.return_value = measurement
+    db.commit.side_effect = IntegrityError(
+        statement="DELETE FROM cow_measurements ...",
+        params={},
+        orig=Exception("database error"),
+    )
+
+    response = client.delete("/measurements/10")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Measurement could not be deleted"}
+
+    db.get.assert_called_once_with(CowMeasurementModel, 10)
+    db.delete.assert_called_once_with(measurement)
+    db.commit.assert_called_once()
+    db.rollback.assert_called_once()

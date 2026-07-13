@@ -53,11 +53,13 @@ def make_measurement(
     measurement.id = measurement_id
     return measurement
 
+# Fake DB
 @pytest.fixture
 def db() -> MagicMock:
     return MagicMock(spec=Session)
 
 
+#Real small test only app, with the cow router mounted to it
 @pytest.fixture
 def client(db: MagicMock) -> Iterator[TestClient]:
     app = FastAPI()
@@ -225,3 +227,120 @@ def test_get_cow_returns_404_when_missing(
     assert response.json() == {"detail": "Cow not found"}
 
     db.scalar.assert_called_once()
+
+def test_create_cow_rejects_extra_fields(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    db.get.return_value = make_farmer()
+
+    def refresh_created_cow(cow: CowModel) -> None:
+        cow.id = 1
+
+    db.refresh.side_effect = refresh_created_cow
+
+    response = client.post(
+        "/cows",
+        json={
+            "tagNumber": "COWTAG1",
+            "cowName": "John Cow",
+            "breed": "Hungarian Grey",
+            "dateOfBirth": "2023-01-01",
+            "farmerId": 1,
+            "unexpectedField": "should not be accepted",
+        },
+    )
+
+    assert response.status_code == 422
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+    db.rollback.assert_not_called()
+
+def test_create_cow_rejects_invalid_tag_number(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    db.get.return_value = make_farmer()
+
+    def refresh_created_cow(cow: CowModel) -> None:
+        cow.id = 1
+
+    db.refresh.side_effect = refresh_created_cow
+
+    response = client.post(
+        "/cows",
+        json={
+            "tagNumber": 1,
+            "cowName": "John Cow",
+            "breed": "Hungarian Grey",
+            "dateOfBirth": "2023-01-01",
+            "farmerId": 1,
+        },
+    )
+
+    assert response.status_code == 422
+
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    db.refresh.assert_not_called()
+    db.rollback.assert_not_called()
+
+
+def test_delete_cow_success(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    cow = make_cow(cow_id=1)
+    db.get.return_value = cow
+
+    response = client.delete("/cows/1")
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+    db.get.assert_called_once_with(CowModel, 1)
+    db.delete.assert_called_once_with(cow)
+    db.commit.assert_called_once()
+    db.rollback.assert_not_called()
+
+
+def test_delete_cow_returns_404_when_cow_does_not_exist(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    db.get.return_value = None
+
+    response = client.delete("/cows/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Cow not found"}
+
+    db.get.assert_called_once_with(CowModel, 999)
+    db.delete.assert_not_called()
+    db.commit.assert_not_called()
+    db.rollback.assert_not_called()
+
+
+def test_delete_cow_rolls_back_when_database_rejects_delete(
+    client: TestClient,
+    db: MagicMock,
+) -> None:
+    cow = make_cow(cow_id=1)
+    db.get.return_value = cow
+    db.commit.side_effect = IntegrityError(
+        statement="DELETE FROM cows ...",
+        params={},
+        orig=Exception("database error"),
+    )
+
+    response = client.delete("/cows/1")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Cow could not be deleted"}
+
+    db.get.assert_called_once_with(CowModel, 1)
+    db.delete.assert_called_once_with(cow)
+    db.commit.assert_called_once()
+    db.rollback.assert_called_once()
