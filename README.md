@@ -36,13 +36,22 @@ Add medicine db table, and events db table, both acting the same way as measurem
 Make frontend for sending API requests
 Add more animals
 Add PATCH requests
+Add CSV import for large cow onboardings
 
 <What I would change if I wanted to make this real(actual product sorta changes):>
+Change to Django
+Change to GraphQL
 Host app on AWS Lambdas
 RDS for PostgreSQL
 Add authentication for Users and Farms
 Soft Deletes, maybe using Glacier
+Logging, Cloudwatch for monitoring
+Report generation
 
+Figure out bad connectivity stuff:
+    Store changes locally on devices when not connected, 
+    when connected apply changes from all devices based on timestamp,
+    Manualy sort out conflicts(job of farm administrator)
 
 
 
