@@ -30,6 +30,7 @@ Delete Measurement
 
 <What I would change if I wanted to make this real(small changes if I had more time):>
 Change primairy keys to UUID
+Use ruff for linting
 Change SQLite to PostgreSQL to handle more data, plus async writes
 Alembic migration to have version control
 Add medicine db table, and events db table, both acting the same way as measurements acts, as a historic table
