@@ -58,21 +58,21 @@ Figure out bad connectivity stuff:
 "Unit tests" use FastAPI's real request handling and pydantic validations
 But they replacethe SQLAlchemy session with a mock
 
-To run unit tests:
+<To run unit tests:>
 uv run pytest tests/app/api/routes/test_cows.py
 uv run pytest tests/app/api/routes/test_measurements.py
 uv run pytest tests/app/api/routes/test_farmers.py
 
-run "end to end":
+<run "end to end":>
 uv run python -m tests.manual_API_requests.end_to_end.total_workflow_test
 
-To run app:
+<To run app:>
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
-Reset DB:
+<Reset DB:>
 uv run python -m tests.manual_API_requests.reset_db
 
-run manual requests:
+<run manual requests:>
 uv run python -m tests.manual_API_requests.run_requests
 
 Example requests:

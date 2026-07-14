@@ -19,7 +19,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
-    expire_on_commit=False,
+    expire_on_commit=False,    #ORM objects keep their attributes
 )
 
 # Using SQLite WAL mode which allows readers and writers to overlap
